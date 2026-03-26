@@ -1,0 +1,82 @@
+services:
+  conduit:
+    build: ./conduit
+    ports:
+      - "8448:6167"
+    volumes:
+      - conduit_data:/var/lib/conduit
+    environment:
+      - CONDUIT_SERVER_NAME=constellation.local
+      - CONDUIT_DATABASE_BACKEND=rocksdb
+      - CONDUIT_PORT=6167
+      - CONDUIT_ALLOW_REGISTRATION=true
+      - CONDUIT_REGISTRATION_SHARED_SECRET=${REGISTRATION_SECRET:-change-me-in-production}
+    networks:
+      - constellation
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:6167/_matrix/client/versions || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  agent-coordinator:
+    build:
+      context: .
+      dockerfile: agents/base.Dockerfile
+    depends_on:
+      conduit:
+        condition: service_healthy
+    environment:
+      - MATRIX_HOMESERVER=http://conduit:6167
+      - AGENT_USERNAME=coordinator
+      - AGENT_PASSWORD=${COORDINATOR_PASSWORD:-coordinator-secret}
+      - AGENT_DISPLAY_NAME=Coordinator Agent
+      - AUTO_JOIN_ROOMS=#constellation:constellation.local
+    volumes:
+      - ./agents/coordinator/agent.py:/app/agent.py:ro
+    networks:
+      - constellation
+
+  agent-researcher:
+    build:
+      context: .
+      dockerfile: agents/base.Dockerfile
+    depends_on:
+      conduit:
+        condition: service_healthy
+    environment:
+      - MATRIX_HOMESERVER=http://conduit:6167
+      - AGENT_USERNAME=researcher
+      - AGENT_PASSWORD=${RESEARCHER_PASSWORD:-researcher-secret}
+      - AGENT_DISPLAY_NAME=Research Agent
+      - AUTO_JOIN_ROOMS=#constellation:constellation.local
+    volumes:
+      - ./agents/researcher/agent.py:/app/agent.py:ro
+    networks:
+      - constellation
+
+  agent-coder:
+    build:
+      context: .
+      dockerfile: agents/base.Dockerfile
+    depends_on:
+      conduit:
+        condition: service_healthy
+    environment:
+      - MATRIX_HOMESERVER=http://conduit:6167
+      - AGENT_USERNAME=coder
+      - AGENT_PASSWORD=${CODER_PASSWORD:-coder-secret}
+      - AGENT_DISPLAY_NAME=Coder Agent
+      - AUTO_JOIN_ROOMS=#constellation:constellation.local
+    volumes:
+      - ./agents/coder/agent.py:/app/agent.py:ro
+    networks:
+      - constellation
+
+volumes:
+  conduit_data:
+
+networks:
+  constellation:
+    driver: bridge

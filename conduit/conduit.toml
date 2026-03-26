@@ -1,0 +1,48 @@
+[global]
+# Constellation A2A - Conduit Matrix Server Configuration
+# Internal agent communication server
+
+# The server_name is the name of this server. It is used as a suffix for
+# user and room IDs. Do not change this after initial setup.
+server_name = "constellation.local"
+
+# The port Conduit will be running on. You need to reverse proxy this port
+# to 443 or 8448 for federation, but since we run internal-only, this is
+# the primary access port.
+port = 6167
+
+# Max size for uploads (20MB for agent payloads)
+max_request_size = 20_000_000
+
+# Disable federation - this is an internal-only server for agent communication
+allow_federation = false
+
+# No trusted servers needed in isolated mode
+trusted_servers = []
+
+# Max concurrent requests
+max_concurrent_requests = 100
+
+# Database backend - rocksdb for performance
+database_backend = "rocksdb"
+
+# Database path inside the container
+database_path = "/var/lib/conduit"
+
+# Allow registration via shared secret only
+# Public registration is disabled; agents register via the shared secret
+allow_registration = true
+
+# Registration shared secret for automated agent registration
+# This will be overridden by the CONDUIT_REGISTRATION_SHARED_SECRET env var
+# if set. The setup script generates a random secret automatically.
+registration_shared_secret = "CHANGE_ME_ON_FIRST_RUN"
+
+# Enable Conduit's built-in admin room for server management
+allow_check_for_updates = false
+
+# Logging configuration
+log = "warn,rocket=off,_=off,sled=off"
+
+# Address to bind to - listen on all interfaces inside the container
+address = "0.0.0.0"

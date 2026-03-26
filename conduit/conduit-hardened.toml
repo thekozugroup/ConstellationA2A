@@ -1,0 +1,36 @@
+[global]
+# Constellation A2A - Hardened Conduit Configuration
+# Production-ready: agents are pre-registered, no public access
+
+# Server identity
+server_name = "constellation.local"
+
+# Listening port (internal only, not exposed to host in production)
+port = 6167
+address = "0.0.0.0"
+
+# Database
+database_backend = "rocksdb"
+database_path = "/var/lib/conduit"
+
+# Registration is fully disabled in production
+# All agent accounts must be pre-registered before switching to this config
+allow_registration = false
+
+# Rate limiting: 10 requests/second per user
+# Conduit does not expose per-user rps tuning directly, but we set
+# max_concurrent_requests low to bound overall throughput
+max_concurrent_requests = 100
+
+# Max request size: 10MB (tighter than dev for production)
+max_request_size = 10_000_000
+
+# Federation is disabled - internal-only server
+allow_federation = false
+trusted_servers = []
+
+# Logging: warn level only, suppress noisy subsystems
+log = "warn,rocket=off,_=off,sled=off"
+
+# Do not phone home
+allow_check_for_updates = false
