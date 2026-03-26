@@ -207,7 +207,7 @@ impl Config {
         self.values.get(key).map(|s| s.as_str())
     }
 
-    pub fn get_or_default<\'a>(&\'a self, key: &str, default: &\'a str) -> &\'a str {
+    pub fn get_or_default<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
         self.get(key).unwrap_or(default)
     }
 

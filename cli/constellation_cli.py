@@ -179,8 +179,7 @@ def cmd_register_agent(args):
         return 1
 
     # Get nonce
-    result = api_request(args.homeserver, "GET", "/_matrix/client/v3/register",
-                        data={"kind": "user"})
+    result = api_request(args.homeserver, "GET", "/_matrix/client/v3/register")
     nonce = result.get("nonce", "")
     if not nonce:
         # Try alternative endpoint

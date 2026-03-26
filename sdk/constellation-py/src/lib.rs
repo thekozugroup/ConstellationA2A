@@ -3,6 +3,7 @@ use std::sync::Arc;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3::ToPyObject;
 use tokio::sync::Mutex;
 
 use constellation_core::{
@@ -24,30 +25,30 @@ fn to_py_err(e: core::ConstellationError) -> PyErr {
 fn json_to_py(py: Python<'_>, val: &serde_json::Value) -> PyObject {
     match val {
         serde_json::Value::Null => py.None(),
-        serde_json::Value::Bool(b) => b.into_pyobject(py).unwrap().into_any().unbind(),
+        serde_json::Value::Bool(b) => b.to_object(py),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                i.into_pyobject(py).unwrap().into_any().unbind()
+                i.to_object(py)
             } else if let Some(f) = n.as_f64() {
-                f.into_pyobject(py).unwrap().into_any().unbind()
+                f.to_object(py)
             } else {
                 py.None()
             }
         }
-        serde_json::Value::String(s) => s.into_pyobject(py).unwrap().into_any().unbind(),
+        serde_json::Value::String(s) => s.to_object(py),
         serde_json::Value::Array(arr) => {
-            let list = PyList::empty(py);
+            let list = PyList::empty_bound(py);
             for item in arr {
                 list.append(json_to_py(py, item)).unwrap();
             }
-            list.into_pyobject(py).unwrap().into_any().unbind()
+            list.to_object(py)
         }
         serde_json::Value::Object(map) => {
-            let dict = PyDict::new(py);
+            let dict = PyDict::new_bound(py);
             for (k, v) in map {
                 dict.set_item(k, json_to_py(py, v)).unwrap();
             }
-            dict.into_pyobject(py).unwrap().into_any().unbind()
+            dict.to_object(py)
         }
     }
 }
@@ -382,7 +383,7 @@ impl MentionEvent {
 
 impl From<core::message::MentionEvent> for MentionEvent {
     fn from(e: core::message::MentionEvent) -> Self {
-        let metadata_json = e.metadata.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default());
+        let metadata_json = e.metadata.as_ref().and_then(|m| serde_json::to_value(m).ok());
         Self {
             sender: e.sender,
             room_id: e.room_id,
@@ -759,7 +760,7 @@ impl ConstellationAgent {
     ///         ...
     fn on_mention(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
         let inner = self.inner.clone();
-        let cb = callback.clone();
+        let cb = callback.clone_ref(py);
 
         // Register the handler on the Rust side. The closure converts the core
         // event into a Python MentionEvent and calls the Python callback.
@@ -769,8 +770,8 @@ impl ConstellationAgent {
                 let agent = inner.lock().await;
                 agent.on_mention(move |core_event| {
                     let py_event: MentionEvent = core_event.into();
-                    let cb = cb.clone();
                     Python::with_gil(|py| {
+                        let cb = cb.clone_ref(py);
                         let event_obj = Py::new(py, py_event).unwrap();
                         let result = cb.call1(py, (event_obj,));
                         if let Ok(awaitable) = result {
@@ -778,7 +779,7 @@ impl ConstellationAgent {
                             // We spawn it on the current tokio runtime via pyo3-async-runtimes.
                             if let Ok(coro) = awaitable.bind(py).getattr("__await__") {
                                 let _ = coro; // coroutine detected
-                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py));
+                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
                                 if let Ok(fut) = future {
                                     tokio::spawn(async move {
                                         if let Err(e) = fut.await {
@@ -791,7 +792,7 @@ impl ConstellationAgent {
                             eprintln!("Error calling on_mention handler: {e}");
                         }
                     });
-                });
+                }).await;
             });
         });
 
@@ -804,7 +805,7 @@ impl ConstellationAgent {
     /// The callback receives a :class:`MessageEvent`.
     fn on_message(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
         let inner = self.inner.clone();
-        let cb = callback.clone();
+        let cb = callback.clone_ref(py);
 
         Python::with_gil(|_| {
             let rt = tokio::runtime::Handle::current();
@@ -812,14 +813,14 @@ impl ConstellationAgent {
                 let agent = inner.lock().await;
                 agent.on_message(move |core_event| {
                     let py_event: MessageEvent = core_event.into();
-                    let cb = cb.clone();
                     Python::with_gil(|py| {
+                        let cb = cb.clone_ref(py);
                         let event_obj = Py::new(py, py_event).unwrap();
                         let result = cb.call1(py, (event_obj,));
                         if let Ok(awaitable) = result {
                             if let Ok(coro) = awaitable.bind(py).getattr("__await__") {
                                 let _ = coro;
-                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py));
+                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
                                 if let Ok(fut) = future {
                                     tokio::spawn(async move {
                                         if let Err(e) = fut.await {
@@ -832,7 +833,7 @@ impl ConstellationAgent {
                             eprintln!("Error calling on_message handler: {e}");
                         }
                     });
-                });
+                }).await;
             });
         });
 
@@ -844,7 +845,7 @@ impl ConstellationAgent {
     /// The callback receives a :class:`TaskEvent`.
     fn on_task(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
         let inner = self.inner.clone();
-        let cb = callback.clone();
+        let cb = callback.clone_ref(py);
 
         Python::with_gil(|_| {
             let rt = tokio::runtime::Handle::current();
@@ -852,14 +853,14 @@ impl ConstellationAgent {
                 let agent = inner.lock().await;
                 agent.on_task(move |core_event| {
                     let py_event: TaskEvent = core_event.into();
-                    let cb = cb.clone();
                     Python::with_gil(|py| {
+                        let cb = cb.clone_ref(py);
                         let event_obj = Py::new(py, py_event).unwrap();
                         let result = cb.call1(py, (event_obj,));
                         if let Ok(awaitable) = result {
                             if let Ok(coro) = awaitable.bind(py).getattr("__await__") {
                                 let _ = coro;
-                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py));
+                                let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
                                 if let Ok(fut) = future {
                                     tokio::spawn(async move {
                                         if let Err(e) = fut.await {
@@ -872,7 +873,7 @@ impl ConstellationAgent {
                             eprintln!("Error calling on_task handler: {e}");
                         }
                     });
-                });
+                }).await;
             });
         });
 

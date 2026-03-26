@@ -98,11 +98,7 @@ class CoordinatorAgent(BaseAgent):
                 AGENT_REGISTRY[sender_name]["last_seen"] = time.time()
 
             # Check if this is a task completion
-            metadata = getattr(event, "metadata", None) or {}
-            if isinstance(metadata, dict):
-                reply_task = metadata.get("task_id") or getattr(event, "reply_to_task", None)
-            else:
-                reply_task = getattr(event, "reply_to_task", None)
+            reply_task = getattr(event, "reply_to_task", None)
 
             if reply_task and reply_task in self.active_tasks:
                 task = self.active_tasks[reply_task]

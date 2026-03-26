@@ -15,7 +15,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./conduit/conduit-hardened.toml:/etc/conduit/conduit.toml:ro
-      - conduit-data:/var/lib/conduit
+      - conduit_data:/var/lib/conduit
     restart: unless-stopped
     deploy:
       resources:
@@ -28,14 +28,14 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - constellation-internal
+      - constellation
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
-  coordinator:
+  agent-coordinator:
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -51,14 +51,14 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - constellation-internal
+      - constellation
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
-  researcher:
+  agent-researcher:
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -74,14 +74,14 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - constellation-internal
+      - constellation
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
-  coder:
+  agent-coder:
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -97,7 +97,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - constellation-internal
+      - constellation
     logging:
       driver: json-file
       options:
@@ -105,9 +105,9 @@ services:
         max-file: "3"
 
 networks:
-  constellation-internal:
+  constellation:
     driver: bridge
     internal: true
 
 volumes:
-  conduit-data:
+  conduit_data:
