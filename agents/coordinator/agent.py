@@ -57,10 +57,16 @@ class CoordinatorAgent(BaseAgent):
             self.log.info("Received mention from %s: %s", sender, body)
 
             # Strip own @-mention from body if present
+            # Handle both @coordinator and @coordinator:server.name formats
             clean_body = body
-            for prefix in (f"@{self.config.username}", f"@coordinator"):
+            for prefix in (
+                f"@{self.config.username}:{self.server_name}",
+                f"@coordinator:{self.server_name}",
+                f"@{self.config.username}",
+                f"@coordinator",
+            ):
                 if clean_body.lower().startswith(prefix.lower()):
-                    clean_body = clean_body[len(prefix):].strip()
+                    clean_body = clean_body[len(prefix):].strip().lstrip(":").strip()
                     break
 
             cmd = clean_body.lower()

@@ -14,7 +14,7 @@ services:
     networks:
       - constellation
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:6167/_matrix/client/versions || exit 1"]
+      test: ["CMD", "/usr/local/bin/healthcheck"]
       interval: 5s
       timeout: 3s
       retries: 10

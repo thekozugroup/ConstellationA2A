@@ -631,6 +631,9 @@ impl TaskResult {
 pub struct ConstellationAgent {
     inner: Arc<Mutex<core::ConstellationAgent>>,
     config: AgentConfig,
+    pending_mention_handlers: Vec<PyObject>,
+    pending_message_handlers: Vec<PyObject>,
+    pending_task_handlers: Vec<PyObject>,
 }
 
 #[pymethods]
@@ -642,6 +645,9 @@ impl ConstellationAgent {
         Ok(Self {
             inner: Arc::new(Mutex::new(agent)),
             config,
+            pending_mention_handlers: Vec::new(),
+            pending_message_handlers: Vec::new(),
+            pending_task_handlers: Vec::new(),
         })
     }
 
@@ -758,135 +764,28 @@ impl ConstellationAgent {
     ///     @agent.on_mention
     ///     async def handle(event):
     ///         ...
-    fn on_mention(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
-        let inner = self.inner.clone();
-        let cb = callback.clone_ref(py);
-
-        // Register the handler on the Rust side. The closure converts the core
-        // event into a Python MentionEvent and calls the Python callback.
-        let rt = tokio::runtime::Handle::current();
-        rt.block_on(async {
-            let agent = inner.lock().await;
-            agent.on_mention(move |core_event| {
-                let py_event: MentionEvent = core_event.into();
-                Python::with_gil(|py| {
-                    let cb = cb.clone_ref(py);
-                    let event_obj = match Py::new(py, py_event) {
-                        Ok(obj) => obj,
-                        Err(e) => {
-                            eprintln!("Error creating MentionEvent: {e}");
-                            return;
-                        }
-                    };
-                    let result = cb.call1(py, (event_obj,));
-                    if let Ok(awaitable) = result {
-                        // If the callback returned a coroutine, we need to drive it.
-                        // We spawn it on the current tokio runtime via pyo3-async-runtimes.
-                        if let Ok(_coro) = awaitable.bind(py).getattr("__await__") {
-                            let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
-                            if let Ok(fut) = future {
-                                tokio::spawn(async move {
-                                    if let Err(e) = fut.await {
-                                        eprintln!("Error in on_mention handler: {e}");
-                                    }
-                                });
-                            }
-                        }
-                    } else if let Err(e) = result {
-                        eprintln!("Error calling on_mention handler: {e}");
-                    }
-                });
-            }).await;
-        });
-
-        // Return the callback so this works as a decorator.
-        Ok(callback)
+    fn on_mention(&mut self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
+        let ret = callback.clone_ref(py);
+        self.pending_mention_handlers.push(callback);
+        Ok(ret)
     }
 
     /// Register a callback for all incoming messages.
     ///
     /// The callback receives a :class:`MessageEvent`.
-    fn on_message(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
-        let inner = self.inner.clone();
-        let cb = callback.clone_ref(py);
-
-        let rt = tokio::runtime::Handle::current();
-        rt.block_on(async {
-            let agent = inner.lock().await;
-            agent.on_message(move |core_event| {
-                let py_event: MessageEvent = core_event.into();
-                Python::with_gil(|py| {
-                    let cb = cb.clone_ref(py);
-                    let event_obj = match Py::new(py, py_event) {
-                        Ok(obj) => obj,
-                        Err(e) => {
-                            eprintln!("Error creating MessageEvent: {e}");
-                            return;
-                        }
-                    };
-                    let result = cb.call1(py, (event_obj,));
-                    if let Ok(awaitable) = result {
-                        if let Ok(_coro) = awaitable.bind(py).getattr("__await__") {
-                            let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
-                            if let Ok(fut) = future {
-                                tokio::spawn(async move {
-                                    if let Err(e) = fut.await {
-                                        eprintln!("Error in on_message handler: {e}");
-                                    }
-                                });
-                            }
-                        }
-                    } else if let Err(e) = result {
-                        eprintln!("Error calling on_message handler: {e}");
-                    }
-                });
-            }).await;
-        });
-
-        Ok(callback)
+    fn on_message(&mut self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
+        let ret = callback.clone_ref(py);
+        self.pending_message_handlers.push(callback);
+        Ok(ret)
     }
 
     /// Register a callback for structured task events.
     ///
     /// The callback receives a :class:`TaskEvent`.
-    fn on_task(&self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
-        let inner = self.inner.clone();
-        let cb = callback.clone_ref(py);
-
-        let rt = tokio::runtime::Handle::current();
-        rt.block_on(async {
-            let agent = inner.lock().await;
-            agent.on_task(move |core_event| {
-                let py_event: TaskEvent = core_event.into();
-                Python::with_gil(|py| {
-                    let cb = cb.clone_ref(py);
-                    let event_obj = match Py::new(py, py_event) {
-                        Ok(obj) => obj,
-                        Err(e) => {
-                            eprintln!("Error creating TaskEvent: {e}");
-                            return;
-                        }
-                    };
-                    let result = cb.call1(py, (event_obj,));
-                    if let Ok(awaitable) = result {
-                        if let Ok(_coro) = awaitable.bind(py).getattr("__await__") {
-                            let future = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone());
-                            if let Ok(fut) = future {
-                                tokio::spawn(async move {
-                                    if let Err(e) = fut.await {
-                                        eprintln!("Error in on_task handler: {e}");
-                                    }
-                                });
-                            }
-                        }
-                    } else if let Err(e) = result {
-                        eprintln!("Error calling on_task handler: {e}");
-                    }
-                });
-            }).await;
-        });
-
-        Ok(callback)
+    fn on_task(&mut self, py: Python<'_>, callback: PyObject) -> PyResult<PyObject> {
+        let ret = callback.clone_ref(py);
+        self.pending_task_handlers.push(callback);
+        Ok(ret)
     }
 
     /// Create a task, send it to a room, and start tracking it.
@@ -945,9 +844,84 @@ impl ConstellationAgent {
     /// Start the sync loop. This blocks until :meth:`disconnect` is called.
     ///
     /// Equivalent to ``await agent.run_forever()``.
-    fn run_forever<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn run_forever<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let inner = self.inner.clone();
+
+        // Drain pending handlers and move them into the async block
+        let mention_cbs: Vec<PyObject> = self.pending_mention_handlers.drain(..).collect();
+        let message_cbs: Vec<PyObject> = self.pending_message_handlers.drain(..).collect();
+        let task_cbs: Vec<PyObject> = self.pending_task_handlers.drain(..).collect();
+
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            // Now we're inside the Tokio runtime — register all handlers
+            {
+                let agent = inner.lock().await;
+                for cb in mention_cbs {
+                    agent.on_mention(move |core_event| {
+                        let py_event: MentionEvent = core_event.into();
+                        Python::with_gil(|py| {
+                            let event_obj = match Py::new(py, py_event) {
+                                Ok(obj) => obj,
+                                Err(e) => { eprintln!("Error creating MentionEvent: {e}"); return; }
+                            };
+                            let result = cb.call1(py, (event_obj,));
+                            if let Ok(awaitable) = result {
+                                if awaitable.bind(py).getattr("__await__").is_ok() {
+                                    if let Ok(fut) = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone()) {
+                                        tokio::spawn(async move { let _ = fut.await; });
+                                    }
+                                }
+                            } else if let Err(e) = result {
+                                eprintln!("Error calling on_mention handler: {e}");
+                            }
+                        });
+                    }).await;
+                }
+                for cb in message_cbs {
+                    agent.on_message(move |core_event| {
+                        let py_event: MessageEvent = core_event.into();
+                        Python::with_gil(|py| {
+                            let event_obj = match Py::new(py, py_event) {
+                                Ok(obj) => obj,
+                                Err(e) => { eprintln!("Error creating MessageEvent: {e}"); return; }
+                            };
+                            let result = cb.call1(py, (event_obj,));
+                            if let Ok(awaitable) = result {
+                                if awaitable.bind(py).getattr("__await__").is_ok() {
+                                    if let Ok(fut) = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone()) {
+                                        tokio::spawn(async move { let _ = fut.await; });
+                                    }
+                                }
+                            } else if let Err(e) = result {
+                                eprintln!("Error calling on_message handler: {e}");
+                            }
+                        });
+                    }).await;
+                }
+                for cb in task_cbs {
+                    agent.on_task(move |core_event| {
+                        let py_event: TaskEvent = core_event.into();
+                        Python::with_gil(|py| {
+                            let event_obj = match Py::new(py, py_event) {
+                                Ok(obj) => obj,
+                                Err(e) => { eprintln!("Error creating TaskEvent: {e}"); return; }
+                            };
+                            let result = cb.call1(py, (event_obj,));
+                            if let Ok(awaitable) = result {
+                                if awaitable.bind(py).getattr("__await__").is_ok() {
+                                    if let Ok(fut) = pyo3_async_runtimes::tokio::into_future(awaitable.bind(py).clone()) {
+                                        tokio::spawn(async move { let _ = fut.await; });
+                                    }
+                                }
+                            } else if let Err(e) = result {
+                                eprintln!("Error calling on_task handler: {e}");
+                            }
+                        });
+                    }).await;
+                }
+            }
+
+            // Now start the sync loop
             let mut agent = inner.lock().await;
             agent.run().await.map_err(to_py_err)?;
             Ok(())

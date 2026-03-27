@@ -74,14 +74,49 @@ class BaseAgent:
         rooms_env = os.environ.get("AUTO_JOIN_ROOMS", "")
         for room_alias in rooms_env.split(","):
             room_alias = room_alias.strip()
-            if room_alias:
-                self.room = await self.agent.join_room(room_alias)
-                self.log.info("Joined room: %s", room_alias)
+            if not room_alias:
+                continue
+            # Try joining; if room doesn't exist, create it (first agent wins)
+            for attempt in range(5):
+                try:
+                    self.room = await self.agent.join_room(room_alias)
+                    self.log.info("Joined room: %s", room_alias)
+                    break
+                except RuntimeError as e:
+                    if "not found" in str(e).lower() or "404" in str(e):
+                        if attempt == 0:
+                            try:
+                                # Extract room name from alias like #constellation:server
+                                room_name = room_alias.split(":")[0].lstrip("#")
+                                self.room = await self.agent.create_room(room_name)
+                                self.log.info("Created room: %s", room_alias)
+                                break
+                            except RuntimeError:
+                                self.log.info("Room creation raced, retrying join...")
+                                await asyncio.sleep(2)
+                        else:
+                            self.log.info("Room not found yet, retrying... (%d/5)", attempt + 1)
+                            await asyncio.sleep(2)
+                    else:
+                        raise
 
         self.register_handlers()
 
         self.log.info("%s running. Waiting for messages...", self.name.capitalize())
-        await self.shutdown_event.wait()
+
+        # run_forever() returns a pyo3 Future, wrap it in ensure_future for asyncio
+        sync_future = self.agent.run_forever()
+        sync_task = asyncio.ensure_future(sync_future)
+        shutdown_task = asyncio.ensure_future(self.shutdown_event.wait())
+
+        # Wait for either: sync loop ends or shutdown signal
+        done, pending = await asyncio.wait(
+            [sync_task, shutdown_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+
         await self.agent.disconnect()
         self.log.info("%s stopped.", self.name.capitalize())
 

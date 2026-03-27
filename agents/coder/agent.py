@@ -374,11 +374,16 @@ class CoderAgent(BaseAgent):
             sender = event.sender
             self.log.info("Code request from %s: %s", sender, body)
 
-            # Strip own @-mention
+            # Strip own @-mention (handles @user:server format)
             clean_body = body
-            for prefix in (f"@{self.config.username}", "@coder"):
+            for prefix in (
+                f"@{self.config.username}:{self.server_name}",
+                f"@coder:{self.server_name}",
+                f"@{self.config.username}",
+                "@coder",
+            ):
                 if clean_body.lower().startswith(prefix.lower()):
-                    clean_body = clean_body[len(prefix):].strip()
+                    clean_body = clean_body[len(prefix):].strip().lstrip(":").strip()
                     break
 
             # Extract task ID

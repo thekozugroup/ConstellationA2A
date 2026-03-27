@@ -1,5 +1,5 @@
 # Stage 1: Build constellation SDK Python wheel from Rust source
-FROM rust:1.80-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 # Install Python, maturin build dependencies, and native libs needed by
 # matrix-sdk (openssl, sqlite, cmake) and pyo3 (python3-dev).
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install maturin for building PyO3 bindings
-RUN pip3 install --break-system-packages maturin
+RUN pip3 install --break-system-packages maturin[patchelf]
 
 # Copy SDK source code
 WORKDIR /build

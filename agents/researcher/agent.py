@@ -131,11 +131,16 @@ class ResearcherAgent(BaseAgent):
             sender = event.sender
             self.log.info("Research request from %s: %s", sender, body)
 
-            # Strip own @-mention from body
+            # Strip own @-mention from body (handles @user:server format)
             clean_body = body
-            for prefix in (f"@{self.config.username}", "@researcher"):
+            for prefix in (
+                f"@{self.config.username}:{self.server_name}",
+                f"@researcher:{self.server_name}",
+                f"@{self.config.username}",
+                "@researcher",
+            ):
                 if clean_body.lower().startswith(prefix.lower()):
-                    clean_body = clean_body[len(prefix):].strip()
+                    clean_body = clean_body[len(prefix):].strip().lstrip(":").strip()
                     break
 
             # Extract task ID if present

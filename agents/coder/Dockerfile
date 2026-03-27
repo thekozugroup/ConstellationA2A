@@ -1,6 +1,6 @@
 # Coder-specific Dockerfile (can also use base.Dockerfile via compose)
 # Stage 1: Build constellation SDK Python wheel from Rust source
-FROM rust:1.80-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     python3-dev \
