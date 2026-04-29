@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "method": "tasks/send",
+  "params": {
+    "id": "task-abc",
+    "message": {
+      "role": "user",
+      "parts": [{ "type": "text", "text": "research Cedric the shrimp" }]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "result": {
+    "id": "task-abc",
+    "status": {
+      "state": "completed",
+      "timestamp": "2026-04-29T18:00:00Z"
+    },
+    "history": [
+      { "role": "user", "parts": [{ "type": "text", "text": "research Cedric" }] },
+      { "role": "agent", "parts": [{ "type": "text", "text": "Cedric is a shrimp." }] }
+    ]
+  }
+}
