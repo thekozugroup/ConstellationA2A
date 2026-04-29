@@ -1,8 +1,8 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use constellation_a2a::{Message, TaskState};
 use rusqlite::params;
 
-use crate::{Result, Store};
+use crate::{Result, Store, StoreError};
 
 #[derive(Debug, Clone)]
 pub struct OutTask {
@@ -11,6 +11,7 @@ pub struct OutTask {
     pub state: TaskState,
     pub request: Message,
     pub response: Option<Message>,
+    pub updated_at: DateTime<Utc>,
 }
 
 pub fn insert(store: &Store, task_id: &str, to_peer: &str, request: &Message) -> Result<()> {
@@ -57,7 +58,7 @@ pub fn set_state(store: &Store, task_id: &str, state: TaskState) -> Result<()> {
 pub fn get(store: &Store, task_id: &str) -> Result<Option<OutTask>> {
     store.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT task_id, to_peer, state, request_json, response_json FROM tasks_out WHERE task_id=?1",
+            "SELECT task_id, to_peer, state, request_json, response_json, updated_at FROM tasks_out WHERE task_id=?1",
         )?;
         let mut rows = stmt.query(params![task_id])?;
         if let Some(row) = rows.next()? {
@@ -66,21 +67,23 @@ pub fn get(store: &Store, task_id: &str) -> Result<Option<OutTask>> {
             let state: String = row.get(2)?;
             let request_json: String = row.get(3)?;
             let response_json: Option<String> = row.get(4)?;
+            let updated_at_str: String = row.get(5)?;
             let request: Message = serde_json::from_str(&request_json)?;
             let response = response_json
                 .as_deref()
                 .map(serde_json::from_str::<Message>)
                 .transpose()?;
-            let state = match state.as_str() {
-                "submitted" => TaskState::Submitted,
-                "working" => TaskState::Working,
-                "input-required" => TaskState::InputRequired,
-                "completed" => TaskState::Completed,
-                "canceled" => TaskState::Canceled,
-                "failed" => TaskState::Failed,
-                _ => TaskState::Unknown,
-            };
-            Ok(Some(OutTask { task_id, to_peer, state, request, response }))
+            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
+                .map_err(|e| StoreError::Date(e.to_string()))?
+                .with_timezone(&Utc);
+            Ok(Some(OutTask {
+                task_id,
+                to_peer,
+                state: TaskState::parse(&state),
+                request,
+                response,
+                updated_at,
+            }))
         } else {
             Ok(None)
         }

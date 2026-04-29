@@ -20,3 +20,10 @@ fn binary_prints_help() {
         assert!(stdout.contains(verb), "help missing verb: {verb}");
     }
 }
+
+#[test]
+fn binary_rejects_unknown_subcommand() {
+    let exe = env!("CARGO_BIN_EXE_constellation");
+    let output = Command::new(exe).arg("frobnicate").output().expect("run");
+    assert!(!output.status.success());
+}

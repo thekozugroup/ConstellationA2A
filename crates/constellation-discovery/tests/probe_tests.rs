@@ -1,5 +1,5 @@
 use constellation_a2a::{AgentCapabilities, AgentCard, Skill};
-use constellation_discovery::probe::probe_card;
+use constellation_discovery::probe::{default_client, probe_card};
 use url::Url;
 use wiremock::{
     matchers::{method, path},
@@ -33,7 +33,8 @@ async fn probe_returns_card_on_200() {
         .respond_with(ResponseTemplate::new(200).set_body_json(&card))
         .mount(&server)
         .await;
-    let got = probe_card(&server.uri()).await.expect("probe ok");
+    let client = default_client(std::time::Duration::from_secs(3));
+    let got = probe_card(&client, &server.uri()).await.expect("probe ok");
     assert_eq!(got.name, "probed");
 }
 
@@ -45,6 +46,7 @@ async fn probe_returns_error_on_404() {
         .respond_with(ResponseTemplate::new(404))
         .mount(&server)
         .await;
-    let res = probe_card(&server.uri()).await;
+    let client = default_client(std::time::Duration::from_secs(3));
+    let res = probe_card(&client, &server.uri()).await;
     assert!(res.is_err());
 }

@@ -3,7 +3,10 @@ use serde::Deserialize;
 use std::net::IpAddr;
 use std::time::Duration;
 
-use crate::{probe::probe_card, DiscoveredPeer, Discoverer};
+use crate::{
+    probe::{default_client, probe_card},
+    DiscoveredPeer, Discoverer,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TailscalePeer {
@@ -59,17 +62,20 @@ pub async fn fetch_status() -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TailscaleDiscoverer {
     pub port: u16,
     pub probe_timeout: Duration,
+    client: reqwest::Client,
 }
 
 impl Default for TailscaleDiscoverer {
     fn default() -> Self {
+        let timeout = Duration::from_secs(3);
         Self {
             port: 7777,
-            probe_timeout: Duration::from_secs(3),
+            probe_timeout: timeout,
+            client: default_client(timeout),
         }
     }
 }
@@ -99,7 +105,7 @@ impl Discoverer for TailscaleDiscoverer {
         let mut out = Vec::new();
         for peer in peers {
             let base = format!("http://{}:{port}", peer.ip);
-            match probe_card(&base).await {
+            match probe_card(&self.client, &base).await {
                 Ok(card) => out.push(DiscoveredPeer {
                     host: peer.host,
                     ip: peer.ip,

@@ -17,6 +17,8 @@ pub enum StoreError {
     Json(#[from] serde_json::Error),
     #[error("date parse error: {0}")]
     Date(String),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("lock poisoned")]
     LockPoisoned,
 }
@@ -31,10 +33,11 @@ impl Store {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         if let Some(parent) = path.as_ref().parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent).ok();
+                std::fs::create_dir_all(parent)?;
             }
         }
         let conn = Connection::open(path)?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
         conn.execute_batch(schema::SCHEMA)?;
         Ok(Self {
             conn: Mutex::new(conn),

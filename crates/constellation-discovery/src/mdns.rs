@@ -2,16 +2,19 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
-use tokio::time::sleep;
 
-use crate::{probe::probe_card, DiscoveredPeer, Discoverer};
+use crate::{
+    probe::{default_client, probe_card},
+    DiscoveredPeer, Discoverer,
+};
 
 pub const SERVICE_TYPE: &str = "_a2a._tcp.local.";
 
 pub struct MdnsDiscoverer {
     daemon: ServiceDaemon,
-    pub local_name: String,
+    pub(crate) local_name: String,
     pub poll_window: Duration,
+    client: reqwest::Client,
 }
 
 impl MdnsDiscoverer {
@@ -21,6 +24,7 @@ impl MdnsDiscoverer {
             daemon,
             local_name: local_name.into(),
             poll_window: Duration::from_millis(800),
+            client: default_client(Duration::from_secs(3)),
         })
     }
 
@@ -52,38 +56,50 @@ impl Discoverer for MdnsDiscoverer {
                 return vec![];
             }
         };
-        let mut out = Vec::new();
-        let deadline = std::time::Instant::now() + self.poll_window;
-        loop {
-            if std::time::Instant::now() >= deadline {
-                break;
-            }
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            tokio::select! {
-                _ = sleep(remaining) => break,
-                evt = tokio::task::spawn_blocking({
-                    let r = receiver.clone();
-                    move || r.recv_timeout(Duration::from_millis(200))
-                }) => {
-                    if let Ok(Ok(ServiceEvent::ServiceResolved(info))) = evt {
-                        let host_name = info.get_fullname()
+        let window = self.poll_window;
+        let local_name = self.local_name.clone();
+        let infos = tokio::task::spawn_blocking(move || {
+            let mut out = Vec::new();
+            let deadline = std::time::Instant::now() + window;
+            while std::time::Instant::now() < deadline {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                match receiver.recv_timeout(remaining.min(Duration::from_millis(200))) {
+                    Ok(ServiceEvent::ServiceResolved(info)) => {
+                        let host_name = info
+                            .get_fullname()
                             .trim_end_matches(SERVICE_TYPE)
                             .trim_end_matches('.')
                             .to_string();
-                        if host_name == self.local_name { continue; }
-                        for ip in info.get_addresses() {
-                            let base = format!("http://{}:{}", ip, info.get_port());
-                            if let Ok(card) = probe_card(&base).await {
-                                out.push(DiscoveredPeer {
-                                    host: host_name.clone(),
-                                    ip: *ip,
-                                    port: info.get_port(),
-                                    card,
-                                });
-                                break;
-                            }
+                        if host_name == local_name {
+                            continue;
                         }
+                        out.push((
+                            host_name,
+                            info.get_addresses().iter().copied().collect::<Vec<_>>(),
+                            info.get_port(),
+                        ));
                     }
+                    Ok(_) => continue,
+                    Err(_) => break,
+                }
+            }
+            out
+        })
+        .await
+        .unwrap_or_default();
+
+        let mut out = Vec::new();
+        for (host_name, ips, port) in infos {
+            for ip in ips {
+                let base = format!("http://{}:{}", ip, port);
+                if let Ok(card) = probe_card(&self.client, &base).await {
+                    out.push(DiscoveredPeer {
+                        host: host_name.clone(),
+                        ip,
+                        port,
+                        card,
+                    });
+                    break;
                 }
             }
         }

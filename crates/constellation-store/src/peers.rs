@@ -12,16 +12,15 @@ pub struct PeerRecord {
 }
 
 pub fn upsert_peer(store: &Store, card: &AgentCard, last_seen: DateTime<Utc>) -> Result<()> {
-    let id = card.url.as_str().to_string();
+    let url_str = card.url.as_str();
     let card_json = serde_json::to_string(card)?;
-    let url = card.url.as_str().to_string();
     let last = last_seen.to_rfc3339();
     store.with_conn(|conn| {
         conn.execute(
             "INSERT INTO peers(id, name, url, card_json, last_seen) VALUES (?1,?2,?3,?4,?5)
              ON CONFLICT(id) DO UPDATE SET name=excluded.name, url=excluded.url,
                  card_json=excluded.card_json, last_seen=excluded.last_seen",
-            params![id, card.name, url, card_json, last],
+            params![url_str, card.name, url_str, card_json, last],
         )?;
         Ok(())
     })

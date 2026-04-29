@@ -7,7 +7,7 @@ pub async fn resolve_advertised_host(setting: &str) -> Result<String> {
     if let Some(ip) = tailscale_ip().await {
         return Ok(ip);
     }
-    if let Some(ip) = first_lan_ipv4()? {
+    if let Some(ip) = first_lan_ipv4().await? {
         return Ok(ip);
     }
     Err(anyhow!(
@@ -31,9 +31,11 @@ async fn tailscale_ip() -> Option<String> {
         .map(|l| l.trim().to_string())
 }
 
-fn first_lan_ipv4() -> Result<Option<String>> {
+async fn first_lan_ipv4() -> Result<Option<String>> {
     use std::net::{IpAddr, Ipv4Addr};
-    let raw = std::process::Command::new("hostname").arg("-I").output()?;
+    let raw =
+        tokio::task::spawn_blocking(|| std::process::Command::new("hostname").arg("-I").output())
+            .await??;
     if !raw.status.success() {
         return Ok(None);
     }

@@ -44,6 +44,18 @@ impl TaskState {
             Self::Unknown => "unknown",
         }
     }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "submitted" => Self::Submitted,
+            "working" => Self::Working,
+            "input-required" => Self::InputRequired,
+            "completed" => Self::Completed,
+            "canceled" => Self::Canceled,
+            "failed" => Self::Failed,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

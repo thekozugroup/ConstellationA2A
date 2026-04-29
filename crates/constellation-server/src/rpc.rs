@@ -1,5 +1,4 @@
 use axum::{extract::State, Json};
-use chrono::Utc;
 use constellation_a2a::{
     JsonRpcError, JsonRpcRequest, JsonRpcResponse, Message, TaskGetParams, TaskGetResult,
     TaskSendParams, TaskState, TaskStatus,
@@ -14,17 +13,23 @@ pub async fn dispatch(
     Json(req): Json<JsonRpcRequest>,
 ) -> Json<serde_json::Value> {
     let id = req.id.clone();
-    let body = match req.method.as_str() {
+    let outcome = match req.method.as_str() {
         "tasks/send" => handle_send(&state.store, req).await,
         "tasks/get" => handle_get(&state.store, req).await,
-        "tasks/cancel" => Err(JsonRpcError::method_not_found("tasks/cancel")),
+        "tasks/cancel" => Err(JsonRpcError {
+            code: -32004,
+            message: "Method not yet implemented: tasks/cancel".into(),
+            data: None,
+        }),
         other => Err(JsonRpcError::method_not_found(other)),
     };
-    let response = match body {
+    let response = match outcome {
         Ok(value) => JsonRpcResponse::<serde_json::Value>::ok(id, value),
         Err(e) => JsonRpcResponse::<serde_json::Value>::err(id, e),
     };
-    Json(serde_json::to_value(response).unwrap())
+    Json(serde_json::to_value(response).unwrap_or_else(|_| {
+        serde_json::json!({"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"failed to encode response"}})
+    }))
 }
 
 async fn handle_send(
@@ -39,11 +44,11 @@ async fn handle_send(
         id: params.id.clone(),
         status: TaskStatus {
             state: TaskState::Submitted,
-            timestamp: Utc::now(),
+            timestamp: chrono::Utc::now(),
         },
         history: vec![params.message],
     };
-    Ok(serde_json::to_value(result).unwrap())
+    serde_json::to_value(result).map_err(|e| JsonRpcError::internal_error(e.to_string()))
 }
 
 async fn handle_get(
@@ -63,9 +68,9 @@ async fn handle_get(
         id: task.task_id,
         status: TaskStatus {
             state: task.state,
-            timestamp: Utc::now(),
+            timestamp: task.updated_at,
         },
         history,
     };
-    Ok(serde_json::to_value(result).unwrap())
+    serde_json::to_value(result).map_err(|e| JsonRpcError::internal_error(e.to_string()))
 }

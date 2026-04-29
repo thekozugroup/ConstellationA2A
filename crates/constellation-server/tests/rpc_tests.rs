@@ -65,7 +65,14 @@ async fn tasks_send_persists_inbound() {
         .unwrap()
         .unwrap();
     assert_eq!(stored.from_peer, "unknown");
-    let _ = stored.request;
+    let part = stored
+        .request
+        .parts
+        .first()
+        .expect("request had a text part");
+    match part {
+        constellation_a2a::Part::Text { text } => assert_eq!(text, "hi"),
+    }
 }
 
 #[tokio::test]

@@ -11,6 +11,7 @@ pub mod wait;
 use crate::config::Config;
 use anyhow::{Context, Result};
 use constellation_a2a::{AgentCapabilities, AgentCard, Skill};
+use std::net::SocketAddr;
 use std::path::Path;
 use url::Url;
 
@@ -20,13 +21,12 @@ pub fn load_config(path: &Path) -> Result<Config> {
 
 pub async fn build_card_from_config(cfg: &Config) -> Result<AgentCard> {
     let host = crate::net::resolve_advertised_host(&cfg.network.advertised_host).await?;
-    let port = cfg
+    let bind: SocketAddr = cfg
         .network
         .bind
-        .split(':')
-        .nth(1)
-        .unwrap_or("7777")
-        .parse::<u16>()?;
+        .parse()
+        .with_context(|| format!("invalid bind address: {}", cfg.network.bind))?;
+    let port = bind.port();
     let url = Url::parse(&format!("http://{host}:{port}"))?;
     let skills = cfg
         .agent

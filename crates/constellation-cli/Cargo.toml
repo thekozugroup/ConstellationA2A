@@ -13,8 +13,6 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
-async-trait = { workspace = true }
-axum = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 constellation-a2a = { path = "../constellation-a2a" }

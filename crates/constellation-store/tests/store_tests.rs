@@ -57,6 +57,7 @@ fn inbound_task_lifecycle() {
     tasks_in::set_response(&store, "t1", &response, TaskState::Completed).unwrap();
     let got = tasks_in::get(&store, "t1").unwrap().unwrap();
     assert_eq!(got.state, TaskState::Completed);
+    assert!(got.updated_at <= chrono::Utc::now());
     assert!(tasks_in::list_pending(&store).unwrap().is_empty());
 }
 
@@ -78,4 +79,5 @@ fn outbound_task_lifecycle() {
     tasks_out::set_response(&store, "t9", &response, TaskState::Completed).unwrap();
     let got = tasks_out::get(&store, "t9").unwrap().unwrap();
     assert_eq!(got.state, TaskState::Completed);
+    assert!(got.updated_at <= chrono::Utc::now());
 }

@@ -2,7 +2,7 @@ use anyhow::Result;
 use constellation_discovery::{
     mdns::MdnsDiscoverer, tailscale::TailscaleDiscoverer, DiscoveredPeer, Discoverer,
 };
-use constellation_server::{build_app, AppState};
+use constellation_server::AppState;
 use constellation_store::{peers as peers_store, Store};
 use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
@@ -21,9 +21,8 @@ pub async fn run(path: &Path) -> Result<()> {
         store: store.clone(),
         card: card.clone(),
     };
-    let app = build_app(app_state);
     let serve_handle = tokio::spawn(async move {
-        if let Err(e) = axum::serve(listener, app).await {
+        if let Err(e) = constellation_server::run(app_state, listener).await {
             tracing::error!(error=?e, "server exited");
         }
     });
@@ -32,10 +31,11 @@ pub async fn run(path: &Path) -> Result<()> {
     let mut discoverers: Vec<Box<dyn Discoverer>> = Vec::new();
     for d in &cfg.network.discovery {
         match d.as_str() {
-            "tailscale" => discoverers.push(Box::new(TailscaleDiscoverer {
-                port,
-                ..Default::default()
-            })),
+            "tailscale" => {
+                let mut ts = TailscaleDiscoverer::default();
+                ts.port = port;
+                discoverers.push(Box::new(ts));
+            }
             "mdns" => match MdnsDiscoverer::new(card.name.clone()) {
                 Ok(m) => {
                     if let Some(host_str) = card.url.host_str() {
@@ -60,7 +60,9 @@ pub async fn run(path: &Path) -> Result<()> {
                 all.append(&mut got);
             }
             for peer in all {
-                let _ = peers_store::upsert_peer(&store, &peer.card, chrono::Utc::now());
+                if let Err(e) = peers_store::upsert_peer(&store, &peer.card, chrono::Utc::now()) {
+                    tracing::warn!(error=?e, "failed to upsert peer");
+                }
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }

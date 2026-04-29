@@ -1,8 +1,8 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use constellation_a2a::{Message, TaskState};
 use rusqlite::params;
 
-use crate::{Result, Store};
+use crate::{Result, Store, StoreError};
 
 #[derive(Debug, Clone)]
 pub struct InTask {
@@ -11,6 +11,7 @@ pub struct InTask {
     pub state: TaskState,
     pub request: Message,
     pub response: Option<Message>,
+    pub updated_at: DateTime<Utc>,
 }
 
 pub fn insert(store: &Store, task_id: &str, from_peer: &str, request: &Message) -> Result<()> {
@@ -46,7 +47,7 @@ pub fn set_response(
 pub fn get(store: &Store, task_id: &str) -> Result<Option<InTask>> {
     store.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT task_id, from_peer, state, request_json, response_json FROM tasks_in WHERE task_id=?1",
+            "SELECT task_id, from_peer, state, request_json, response_json, updated_at FROM tasks_in WHERE task_id=?1",
         )?;
         let mut rows = stmt.query(params![task_id])?;
         if let Some(row) = rows.next()? {
@@ -55,13 +56,23 @@ pub fn get(store: &Store, task_id: &str) -> Result<Option<InTask>> {
             let state: String = row.get(2)?;
             let request_json: String = row.get(3)?;
             let response_json: Option<String> = row.get(4)?;
+            let updated_at_str: String = row.get(5)?;
             let request: Message = serde_json::from_str(&request_json)?;
             let response = response_json
                 .as_deref()
                 .map(serde_json::from_str::<Message>)
                 .transpose()?;
-            let state = parse_state(&state);
-            Ok(Some(InTask { task_id, from_peer, state, request, response }))
+            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
+                .map_err(|e| StoreError::Date(e.to_string()))?
+                .with_timezone(&Utc);
+            Ok(Some(InTask {
+                task_id,
+                from_peer,
+                state: TaskState::parse(&state),
+                request,
+                response,
+                updated_at,
+            }))
         } else {
             Ok(None)
         }
@@ -72,25 +83,11 @@ pub fn list_pending(store: &Store) -> Result<Vec<InTask>> {
     list_with_states(store, &["submitted", "working", "input-required"])
 }
 
-pub fn list_all(store: &Store) -> Result<Vec<InTask>> {
-    list_with_states(
-        store,
-        &[
-            "submitted",
-            "working",
-            "input-required",
-            "completed",
-            "canceled",
-            "failed",
-        ],
-    )
-}
-
 fn list_with_states(store: &Store, states: &[&str]) -> Result<Vec<InTask>> {
     store.with_conn(|conn| {
         let placeholders = states.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
-            "SELECT task_id, from_peer, state, request_json, response_json
+            "SELECT task_id, from_peer, state, request_json, response_json, updated_at
              FROM tasks_in WHERE state IN ({placeholders}) ORDER BY created_at"
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -102,36 +99,36 @@ fn list_with_states(store: &Store, states: &[&str]) -> Result<Vec<InTask>> {
                 let state: String = row.get(2)?;
                 let request_json: String = row.get(3)?;
                 let response_json: Option<String> = row.get(4)?;
-                Ok((task_id, from_peer, state, request_json, response_json))
+                let updated_at_str: String = row.get(5)?;
+                Ok((
+                    task_id,
+                    from_peer,
+                    state,
+                    request_json,
+                    response_json,
+                    updated_at_str,
+                ))
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let mut out = Vec::with_capacity(rows.len());
-        for (task_id, from_peer, state, request_json, response_json) in rows {
+        for (task_id, from_peer, state, request_json, response_json, updated_at_str) in rows {
             let request: Message = serde_json::from_str(&request_json)?;
             let response = response_json
                 .as_deref()
                 .map(serde_json::from_str::<Message>)
                 .transpose()?;
+            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
+                .map_err(|e| StoreError::Date(e.to_string()))?
+                .with_timezone(&Utc);
             out.push(InTask {
                 task_id,
                 from_peer,
-                state: parse_state(&state),
+                state: TaskState::parse(&state),
                 request,
                 response,
+                updated_at,
             });
         }
         Ok(out)
     })
-}
-
-fn parse_state(s: &str) -> TaskState {
-    match s {
-        "submitted" => TaskState::Submitted,
-        "working" => TaskState::Working,
-        "input-required" => TaskState::InputRequired,
-        "completed" => TaskState::Completed,
-        "canceled" => TaskState::Canceled,
-        "failed" => TaskState::Failed,
-        _ => TaskState::Unknown,
-    }
 }

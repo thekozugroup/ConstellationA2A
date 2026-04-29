@@ -16,3 +16,12 @@ pub fn build_app(state: AppState) -> Router {
         .route("/.well-known/agent.json", get(well_known::get_agent_card))
         .with_state(state)
 }
+
+use anyhow::Result;
+use tokio::net::TcpListener;
+
+pub async fn run(state: AppState, listener: TcpListener) -> Result<()> {
+    let app = build_app(state);
+    axum::serve(listener, app).await?;
+    Ok(())
+}
