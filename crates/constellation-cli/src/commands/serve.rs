@@ -65,19 +65,23 @@ pub async fn run(path: &Path) -> Result<()> {
                 .iter()
                 .map(|d| async move { (d.name(), d.poll().await) });
             let results = join_all(polls).await;
-            let mut all = Vec::new();
+            let mut all: Vec<constellation_discovery::DiscoveredPeer> = Vec::new();
             for (name, mut got) in results {
-                tracing::debug!(target = name, found = got.len(), "discovered");
+                tracing::debug!(discoverer = name, found = got.len(), "discovered");
                 all.append(&mut got);
             }
-            for peer in all {
-                if let Err(e) = peers_store::upsert_peer(&store, &peer.card, chrono::Utc::now()) {
-                    tracing::warn!(error=?e, "failed to upsert peer");
+            let store_for_writes = store.clone();
+            if let Err(e) = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+                for peer in all {
+                    peers_store::upsert_peer(&store_for_writes, &peer.card, chrono::Utc::now())?;
                 }
-            }
-            let cutoff = chrono::Utc::now() - chrono::Duration::minutes(5);
-            if let Err(e) = peers_store::prune_older_than(&store, cutoff) {
-                tracing::warn!(error=?e, "failed to prune stale peers");
+                let cutoff = chrono::Utc::now() - chrono::Duration::minutes(5);
+                peers_store::prune_older_than(&store_for_writes, cutoff)?;
+                Ok(())
+            })
+            .await
+            {
+                tracing::warn!(error=?e, "discovery store write join error");
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }

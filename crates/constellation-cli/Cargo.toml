@@ -1,5 +1,6 @@
 [package]
 name = "constellation-cli"
+description = "constellation binary — runs an A2A peer node and CLI"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,5 +1,6 @@
 [package]
 name = "constellation-store"
+description = "SQLite-backed peer and task store for Constellation A2A"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

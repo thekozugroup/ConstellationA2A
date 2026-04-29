@@ -101,3 +101,32 @@ fn inbound_insert_is_idempotent() {
     tasks_in::insert(&store, "dup", "peer", &msg).unwrap();
     assert_eq!(tasks_in::list_pending(&store).unwrap().len(), 1);
 }
+
+#[test]
+fn inbound_get_returns_none_for_unknown_id() {
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    assert!(tasks_in::get(&store, "missing").unwrap().is_none());
+}
+
+#[test]
+fn prune_older_than_removes_stale_peers() {
+    use chrono::Duration;
+
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    let now = Utc::now();
+    let stale = now - Duration::minutes(10);
+    let fresh = now;
+    let mut card_a = sample_card();
+    card_a.url = url::Url::parse("http://10.0.0.1:7777").unwrap();
+    let mut card_b = sample_card();
+    card_b.url = url::Url::parse("http://10.0.0.2:7777").unwrap();
+    peers::upsert_peer(&store, &card_a, stale).unwrap();
+    peers::upsert_peer(&store, &card_b, fresh).unwrap();
+    let removed = peers::prune_older_than(&store, now - Duration::minutes(5)).unwrap();
+    assert_eq!(removed, 1);
+    let remaining = peers::list_peers(&store).unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].card.url.host_str(), Some("10.0.0.2"));
+}

@@ -1,5 +1,6 @@
 [package]
 name = "constellation-server"
+description = "Axum-based A2A JSON-RPC HTTP server for Constellation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

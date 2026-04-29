@@ -68,7 +68,7 @@ async fn handle_send(
     .map_err(|e| JsonRpcError::internal_error(format!("join error: {e}")))?
     .map_err(|e| JsonRpcError::internal_error(e.to_string()))?;
     let result = TaskGetResult {
-        id: params.id.clone(),
+        id: params.id,
         status: TaskStatus {
             state: TaskState::Submitted,
             timestamp: Utc::now(),

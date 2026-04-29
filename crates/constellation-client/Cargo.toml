@@ -1,5 +1,6 @@
 [package]
 name = "constellation-client"
+description = "A2A JSON-RPC HTTP client for Constellation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
