@@ -1,5 +1,6 @@
 //! mDNS-based peer discoverer.
 
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -121,19 +122,31 @@ impl Discoverer for MdnsDiscoverer {
         .await
         .unwrap_or_default();
 
-        let mut out = Vec::new();
-        for (host_name, ips, port) in infos {
-            for ip in ips {
-                let base = format!("http://{}:{}", ip, port);
-                if let Ok(card) = probe_card(&self.client, &base).await {
-                    out.push(DiscoveredPeer {
-                        host: host_name.clone(),
-                        ip,
-                        port,
-                        card,
-                    });
-                    break;
+        let client = self.client.clone();
+        let mut tasks: FuturesUnordered<_> = infos
+            .into_iter()
+            .map(|(host_name, ips, port)| {
+                let client = client.clone();
+                async move {
+                    for ip in ips {
+                        let base = format!("http://{}:{}", ip, port);
+                        if let Ok(card) = probe_card(&client, &base).await {
+                            return Some(DiscoveredPeer {
+                                host: host_name,
+                                ip,
+                                port,
+                                card,
+                            });
+                        }
+                    }
+                    None
                 }
+            })
+            .collect();
+        let mut out = Vec::new();
+        while let Some(maybe) = tasks.next().await {
+            if let Some(p) = maybe {
+                out.push(p);
             }
         }
         out

@@ -15,6 +15,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+futures-util = { workspace = true }
 constellation-a2a = { path = "../constellation-a2a" }
 constellation-client = { path = "../constellation-client" }
 constellation-discovery = { path = "../constellation-discovery" }

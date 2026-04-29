@@ -1,11 +1,10 @@
 //! `constellation serve` command — start the A2A server and discovery loop.
 
 use anyhow::Result;
-use constellation_discovery::{
-    mdns::MdnsDiscoverer, tailscale::TailscaleDiscoverer, DiscoveredPeer, Discoverer,
-};
+use constellation_discovery::{mdns::MdnsDiscoverer, tailscale::TailscaleDiscoverer, Discoverer};
 use constellation_server::AppState;
 use constellation_store::{peers as peers_store, Store};
+use futures_util::future::join_all;
 use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 
@@ -34,11 +33,10 @@ pub async fn run(path: &Path) -> Result<()> {
     let mut discoverers: Vec<Box<dyn Discoverer>> = Vec::new();
     for d in &cfg.network.discovery {
         match d.as_str() {
-            "tailscale" => {
-                let mut ts = TailscaleDiscoverer::default();
-                ts.port = port;
-                discoverers.push(Box::new(ts));
-            }
+            "tailscale" => discoverers.push(Box::new(TailscaleDiscoverer::new(
+                port,
+                std::time::Duration::from_secs(3),
+            ))),
             "mdns" => match MdnsDiscoverer::new(card.name.clone()) {
                 Ok(m) => {
                     if let Some(host_str) = card.url.host_str() {
@@ -63,16 +61,23 @@ pub async fn run(path: &Path) -> Result<()> {
 
     let discovery_handle = tokio::spawn(async move {
         loop {
-            let mut all: Vec<DiscoveredPeer> = Vec::new();
-            for d in &discoverers {
-                let mut got = d.poll().await;
-                tracing::debug!(target = d.name(), found = got.len(), "discovered");
+            let polls = discoverers
+                .iter()
+                .map(|d| async move { (d.name(), d.poll().await) });
+            let results = join_all(polls).await;
+            let mut all = Vec::new();
+            for (name, mut got) in results {
+                tracing::debug!(target = name, found = got.len(), "discovered");
                 all.append(&mut got);
             }
             for peer in all {
                 if let Err(e) = peers_store::upsert_peer(&store, &peer.card, chrono::Utc::now()) {
                     tracing::warn!(error=?e, "failed to upsert peer");
                 }
+            }
+            let cutoff = chrono::Utc::now() - chrono::Duration::minutes(5);
+            if let Err(e) = peers_store::prune_older_than(&store, cutoff) {
+                tracing::warn!(error=?e, "failed to prune stale peers");
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }

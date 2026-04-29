@@ -35,7 +35,7 @@ pub fn upsert_peer(store: &Store, card: &AgentCard, last_seen: DateTime<Utc>) ->
 
 /// Return all known peers, ordered by name.
 pub fn list_peers(store: &Store) -> Result<Vec<PeerRecord>> {
-    store.with_conn(|conn| {
+    let raw_rows = store.with_conn(|conn| {
         let mut stmt = conn.prepare("SELECT id, card_json, last_seen FROM peers ORDER BY name")?;
         let rows = stmt
             .query_map([], |row| {
@@ -45,20 +45,21 @@ pub fn list_peers(store: &Store) -> Result<Vec<PeerRecord>> {
                 Ok((id, card_json, last_seen))
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        let mut out = Vec::with_capacity(rows.len());
-        for (id, card_json, last_seen) in rows {
-            let card: AgentCard = serde_json::from_str(&card_json)?;
-            let last_seen = DateTime::parse_from_rfc3339(&last_seen)
-                .map_err(|e| StoreError::Date(e.to_string()))?
-                .with_timezone(&Utc);
-            out.push(PeerRecord {
-                id,
-                card,
-                last_seen,
-            });
-        }
-        Ok(out)
-    })
+        Ok(rows)
+    })?;
+    let mut out = Vec::with_capacity(raw_rows.len());
+    for (id, card_json, last_seen) in raw_rows {
+        let card: AgentCard = serde_json::from_str(&card_json)?;
+        let last_seen = DateTime::parse_from_rfc3339(&last_seen)
+            .map_err(|e| StoreError::Date(e.to_string()))?
+            .with_timezone(&Utc);
+        out.push(PeerRecord {
+            id,
+            card,
+            last_seen,
+        });
+    }
+    Ok(out)
 }
 
 /// Delete all peer records with `last_seen` older than `cutoff`.

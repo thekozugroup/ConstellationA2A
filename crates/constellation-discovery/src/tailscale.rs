@@ -71,7 +71,7 @@ pub async fn fetch_status() -> Result<String> {
 #[derive(Clone)]
 pub struct TailscaleDiscoverer {
     /// Port to probe on each peer.
-    pub port: u16,
+    port: u16,
     probe_timeout: Duration,
     client: reqwest::Client,
 }

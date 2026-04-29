@@ -16,3 +16,7 @@ pub use task::{
 /// Canonical default A2A port. Used by both the CLI's bind defaults and the
 /// Tailscale discoverer's probe URL construction.
 pub const DEFAULT_PORT: u16 = 7777;
+
+/// HTTP header name a peer sends to advertise its callback URL.
+/// Lower-case canonical form (HTTP header names are case-insensitive).
+pub const SOURCE_URL_HEADER: &str = "x-a2a-source-url";

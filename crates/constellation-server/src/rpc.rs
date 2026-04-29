@@ -4,15 +4,12 @@ use axum::{extract::State, http::HeaderMap, Json};
 use chrono::Utc;
 use constellation_a2a::{
     JsonRpcError, JsonRpcRequest, JsonRpcResponse, Message, TaskGetParams, TaskGetResult,
-    TaskSendParams, TaskState, TaskStatus,
+    TaskSendParams, TaskState, TaskStatus, SOURCE_URL_HEADER,
 };
 use constellation_store::{tasks_in, Store};
 use std::sync::Arc;
 
 use crate::state::AppState;
-
-/// HTTP header used to convey the caller's own A2A endpoint URL.
-pub const SOURCE_URL_HEADER: &str = "x-a2a-source-url";
 
 /// Main JSON-RPC dispatch entry point; reads `X-A2A-Source-Url` from headers.
 pub async fn dispatch(
@@ -32,11 +29,7 @@ pub async fn dispatch(
         "tasks/get" => handle_get(&state.store, req).await,
         // -32004: task subsystem is implemented, but cancel is not yet wired
         // (out-of-scope for v1 per spec). Distinct from -32601 method-not-found.
-        "tasks/cancel" => Err(JsonRpcError {
-            code: -32004,
-            message: "Method not yet implemented: tasks/cancel".into(),
-            data: None,
-        }),
+        "tasks/cancel" => Err(JsonRpcError::not_implemented("tasks/cancel")),
         other => Err(JsonRpcError::method_not_found(other)),
     };
     let response = match outcome {
@@ -59,8 +52,21 @@ async fn handle_send(
 ) -> Result<serde_json::Value, JsonRpcError> {
     let params: TaskSendParams = serde_json::from_value(req.params)
         .map_err(|e| JsonRpcError::invalid_params(e.to_string()))?;
-    tasks_in::insert(store, &params.id, from_peer, &params.message)
-        .map_err(|e| JsonRpcError::internal_error(e.to_string()))?;
+    let store_for_blocking = store.clone();
+    let from_peer_owned = from_peer.to_string();
+    let id_for_blocking = params.id.clone();
+    let msg_for_blocking = params.message.clone();
+    tokio::task::spawn_blocking(move || {
+        tasks_in::insert(
+            &store_for_blocking,
+            &id_for_blocking,
+            &from_peer_owned,
+            &msg_for_blocking,
+        )
+    })
+    .await
+    .map_err(|e| JsonRpcError::internal_error(format!("join error: {e}")))?
+    .map_err(|e| JsonRpcError::internal_error(e.to_string()))?;
     let result = TaskGetResult {
         id: params.id.clone(),
         status: TaskStatus {
@@ -79,9 +85,14 @@ async fn handle_get(
 ) -> Result<serde_json::Value, JsonRpcError> {
     let params: TaskGetParams = serde_json::from_value(req.params)
         .map_err(|e| JsonRpcError::invalid_params(e.to_string()))?;
-    let task = tasks_in::get(store, &params.id)
-        .map_err(|e| JsonRpcError::internal_error(e.to_string()))?
-        .ok_or_else(|| JsonRpcError::task_not_found(&params.id))?;
+    let store_for_blocking = store.clone();
+    let id_for_blocking = params.id.clone();
+    let task =
+        tokio::task::spawn_blocking(move || tasks_in::get(&store_for_blocking, &id_for_blocking))
+            .await
+            .map_err(|e| JsonRpcError::internal_error(format!("join error: {e}")))?
+            .map_err(|e| JsonRpcError::internal_error(e.to_string()))?
+            .ok_or_else(|| JsonRpcError::task_not_found(&params.id))?;
     let mut history: Vec<Message> = vec![task.request];
     if let Some(resp) = task.response {
         history.push(resp);

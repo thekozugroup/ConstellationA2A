@@ -34,8 +34,10 @@ pub async fn run(path: &Path, task_id: &str, timeout_secs: u64) -> Result<()> {
                         .collect::<Vec<_>>()
                         .join("\n");
                     println!("{body}");
+                    tasks_out::set_response(&store, task_id, last, result.status.state.clone())?;
+                } else {
+                    tasks_out::set_state(&store, task_id, result.status.state)?;
                 }
-                tasks_out::set_state(&store, task_id, result.status.state)?;
                 return Ok(());
             }
             _ => {

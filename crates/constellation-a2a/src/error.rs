@@ -66,4 +66,13 @@ impl JsonRpcError {
             data: None,
         }
     }
+
+    /// A2A-specific: method recognised but not implemented in this build.
+    pub fn not_implemented(method: &str) -> Self {
+        Self {
+            code: -32004,
+            message: format!("Method not yet implemented: {method}"),
+            data: None,
+        }
+    }
 }

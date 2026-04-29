@@ -3,14 +3,11 @@
 use anyhow::{anyhow, Result};
 use constellation_a2a::{
     JsonRpcRequest, JsonRpcResponse, JsonRpcVersion, Message, TaskGetParams, TaskGetResult,
-    TaskSendParams,
+    TaskSendParams, SOURCE_URL_HEADER,
 };
 use reqwest::Client;
 use serde_json::json;
 use std::time::Duration;
-
-/// HTTP header used to advertise the caller's own A2A endpoint URL.
-pub const SOURCE_URL_HEADER: &str = "X-A2A-Source-Url";
 
 /// HTTP client for sending A2A JSON-RPC requests to remote peers.
 #[derive(Clone)]

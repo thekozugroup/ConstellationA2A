@@ -41,3 +41,17 @@ async fn send_task_round_trip() {
     assert_eq!(task.id, "t-1");
     assert_eq!(task.status.state, TaskState::Completed);
 }
+
+#[tokio::test]
+async fn get_task_round_trip() {
+    let server = MockServer::start().await;
+    let result = fake_result("t-2");
+    let response: JsonRpcResponse<TaskGetResult> = JsonRpcResponse::ok(json!("1"), result);
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&response))
+        .mount(&server)
+        .await;
+    let client = A2aClient::new();
+    let task = client.get_task(&server.uri(), "t-2").await.expect("get");
+    assert_eq!(task.id, "t-2");
+}

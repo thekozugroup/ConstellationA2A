@@ -169,3 +169,37 @@ async fn tasks_get_returns_task_not_found_for_unknown_id() {
     let err: JsonRpcError = resp.error.expect("error");
     assert_eq!(err.code, -32001);
 }
+
+#[tokio::test]
+async fn tasks_cancel_returns_not_implemented() {
+    let dir = tempdir().unwrap();
+    let store = Arc::new(Store::open(dir.path().join("s.db")).unwrap());
+    let state = AppState {
+        store,
+        card: card(),
+    };
+    let app = build_app(state);
+    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let body = json!({
+        "jsonrpc":"2.0","id":"1","method":"tasks/cancel",
+        "params":{"id":"x"}
+    });
+    let resp: JsonRpcResponse<TaskGetResult> = reqwest::Client::new()
+        .post(format!("http://{addr}"))
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let err = resp.error.expect("error");
+    assert_eq!(err.code, -32004);
+}
