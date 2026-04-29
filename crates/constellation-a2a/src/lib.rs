@@ -12,3 +12,7 @@ pub use task::{
     Message, Part, Role, TaskGetParams, TaskGetResult, TaskSendParams, TaskSendResult, TaskState,
     TaskStatus,
 };
+
+/// Canonical default A2A port. Used by both the CLI's bind defaults and the
+/// Tailscale discoverer's probe URL construction.
+pub const DEFAULT_PORT: u16 = 7777;

@@ -11,6 +11,7 @@ rust-version.workspace = true
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 constellation-a2a = { path = "../constellation-a2a" }
+futures-util = { workspace = true }
 mdns-sd = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

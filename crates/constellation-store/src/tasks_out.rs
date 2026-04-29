@@ -1,19 +1,29 @@
+//! Store operations for outbound tasks sent to remote peers.
+
 use chrono::{DateTime, Utc};
 use constellation_a2a::{Message, TaskState};
 use rusqlite::params;
 
 use crate::{Result, Store, StoreError};
 
+/// A task sent from this agent to a remote peer.
 #[derive(Debug, Clone)]
 pub struct OutTask {
+    /// Stable identifier chosen by this agent.
     pub task_id: String,
+    /// Name of the peer this task was sent to.
     pub to_peer: String,
+    /// Current lifecycle state as last observed.
     pub state: TaskState,
+    /// Original request message.
     pub request: Message,
+    /// Response message returned by the peer, if available.
     pub response: Option<Message>,
+    /// When this row was last modified.
     pub updated_at: DateTime<Utc>,
 }
 
+/// Insert a new outbound task, ignoring duplicates (idempotent).
 pub fn insert(store: &Store, task_id: &str, to_peer: &str, request: &Message) -> Result<()> {
     let now = Utc::now().to_rfc3339();
     let req_json = serde_json::to_string(request)?;
@@ -27,6 +37,7 @@ pub fn insert(store: &Store, task_id: &str, to_peer: &str, request: &Message) ->
     })
 }
 
+/// Record a response message and update the task state.
 pub fn set_response(
     store: &Store,
     task_id: &str,
@@ -44,6 +55,7 @@ pub fn set_response(
     })
 }
 
+/// Update only the state of an outbound task (e.g. after polling the peer).
 pub fn set_state(store: &Store, task_id: &str, state: TaskState) -> Result<()> {
     let now = Utc::now().to_rfc3339();
     store.with_conn(|conn| {
@@ -55,6 +67,7 @@ pub fn set_state(store: &Store, task_id: &str, state: TaskState) -> Result<()> {
     })
 }
 
+/// Fetch a single outbound task by ID, returning `None` if not found.
 pub fn get(store: &Store, task_id: &str) -> Result<Option<OutTask>> {
     store.with_conn(|conn| {
         let mut stmt = conn.prepare(

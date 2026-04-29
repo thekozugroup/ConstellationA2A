@@ -1,16 +1,23 @@
+//! Store operations for discovered remote peers.
+
 use chrono::{DateTime, Utc};
 use constellation_a2a::AgentCard;
 use rusqlite::params;
 
 use crate::{Result, Store, StoreError};
 
+/// A persisted record of a discovered peer.
 #[derive(Debug, Clone)]
 pub struct PeerRecord {
+    /// Stable identifier (the peer's URL string).
     pub id: String,
+    /// Agent card as returned by the peer's discovery endpoint.
     pub card: AgentCard,
+    /// Timestamp of the last successful probe.
     pub last_seen: DateTime<Utc>,
 }
 
+/// Insert or update a peer record, refreshing `last_seen`.
 pub fn upsert_peer(store: &Store, card: &AgentCard, last_seen: DateTime<Utc>) -> Result<()> {
     let url_str = card.url.as_str();
     let card_json = serde_json::to_string(card)?;
@@ -26,6 +33,7 @@ pub fn upsert_peer(store: &Store, card: &AgentCard, last_seen: DateTime<Utc>) ->
     })
 }
 
+/// Return all known peers, ordered by name.
 pub fn list_peers(store: &Store) -> Result<Vec<PeerRecord>> {
     store.with_conn(|conn| {
         let mut stmt = conn.prepare("SELECT id, card_json, last_seen FROM peers ORDER BY name")?;
@@ -53,6 +61,7 @@ pub fn list_peers(store: &Store) -> Result<Vec<PeerRecord>> {
     })
 }
 
+/// Delete all peer records with `last_seen` older than `cutoff`.
 pub fn prune_older_than(store: &Store, cutoff: DateTime<Utc>) -> Result<usize> {
     store.with_conn(|conn| {
         let n = conn.execute(

@@ -1,9 +1,12 @@
+//! `constellation init` command — generate an initial config file.
+
 use anyhow::{Context, Result};
 use std::path::Path;
 
 use crate::config::{AgentSection, Config, NetworkSection, StoreSection};
 use crate::prompt::render;
 
+/// Write a fresh config file at `path`, printing a setup prompt for an LLM coding agent.
 pub async fn run(
     path: &Path,
     name: Option<String>,
@@ -16,7 +19,7 @@ pub async fn run(
             .unwrap_or_else(|_| "constellation-node".to_string())
     });
     let skills = skills.unwrap_or_else(|| vec!["general".to_string()]);
-    let port = port.unwrap_or(7777);
+    let port = port.unwrap_or(constellation_a2a::DEFAULT_PORT);
     let cfg = Config {
         agent: AgentSection {
             name: name.clone(),

@@ -1,16 +1,19 @@
+//! Tailscale-based peer discoverer.
+
 use anyhow::{Context, Result};
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use serde::Deserialize;
 use std::net::IpAddr;
 use std::time::Duration;
 
-use crate::{
-    probe::{default_client, probe_card},
-    DiscoveredPeer, Discoverer,
-};
+use crate::{probe::probe_card, DiscoveredPeer, Discoverer};
 
+/// A Tailscale peer that is currently online.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TailscalePeer {
+    /// Hostname reported by Tailscale.
     pub host: String,
+    /// Primary Tailscale IP address.
     pub ip: IpAddr,
 }
 
@@ -30,6 +33,7 @@ struct NodeJson {
     host_name: String,
 }
 
+/// Parse the JSON output of `tailscale status --json` into a list of online peers.
 pub fn parse_status_json(raw: &str) -> Result<Vec<TailscalePeer>> {
     let parsed: StatusJson = serde_json::from_str(raw).context("parse tailscale status")?;
     let mut out = Vec::new();
@@ -49,6 +53,7 @@ pub fn parse_status_json(raw: &str) -> Result<Vec<TailscalePeer>> {
     Ok(out)
 }
 
+/// Invoke `tailscale status --json` and return its raw output.
 pub async fn fetch_status() -> Result<String> {
     let out = tokio::process::Command::new("tailscale")
         .arg("status")
@@ -62,21 +67,34 @@ pub async fn fetch_status() -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// Discovers A2A peers reachable on the local Tailscale network.
 #[derive(Clone)]
 pub struct TailscaleDiscoverer {
+    /// Port to probe on each peer.
     pub port: u16,
-    pub probe_timeout: Duration,
+    probe_timeout: Duration,
     client: reqwest::Client,
 }
 
 impl Default for TailscaleDiscoverer {
     fn default() -> Self {
-        let timeout = Duration::from_secs(3);
+        Self::new(constellation_a2a::DEFAULT_PORT, Duration::from_secs(3))
+    }
+}
+
+impl TailscaleDiscoverer {
+    /// Create a new discoverer that probes the given `port` with the given `probe_timeout`.
+    pub fn new(port: u16, probe_timeout: Duration) -> Self {
         Self {
-            port: 7777,
-            probe_timeout: timeout,
-            client: default_client(timeout),
+            port,
+            probe_timeout,
+            client: crate::probe::default_client(probe_timeout),
         }
+    }
+
+    /// Return the configured per-probe HTTP timeout.
+    pub fn probe_timeout(&self) -> Duration {
+        self.probe_timeout
     }
 }
 
@@ -102,17 +120,29 @@ impl Discoverer for TailscaleDiscoverer {
             }
         };
         let port = self.port;
+        let client = &self.client;
+        let mut tasks: FuturesUnordered<_> = peers
+            .into_iter()
+            .map(|peer| async move {
+                let base = format!("http://{}:{port}", peer.ip);
+                match probe_card(client, &base).await {
+                    Ok(card) => Some(DiscoveredPeer {
+                        host: peer.host,
+                        ip: peer.ip,
+                        port,
+                        card,
+                    }),
+                    Err(e) => {
+                        tracing::debug!(host=%peer.host, error=%e, "probe failed");
+                        None
+                    }
+                }
+            })
+            .collect();
         let mut out = Vec::new();
-        for peer in peers {
-            let base = format!("http://{}:{port}", peer.ip);
-            match probe_card(&self.client, &base).await {
-                Ok(card) => out.push(DiscoveredPeer {
-                    host: peer.host,
-                    ip: peer.ip,
-                    port,
-                    card,
-                }),
-                Err(e) => tracing::debug!(host=%peer.host, error=%e, "probe failed"),
+        while let Some(maybe) = tasks.next().await {
+            if let Some(p) = maybe {
+                out.push(p);
             }
         }
         out

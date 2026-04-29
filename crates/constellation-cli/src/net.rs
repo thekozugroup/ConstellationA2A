@@ -1,5 +1,11 @@
+//! Network helpers for resolving the advertised host address.
+
 use anyhow::{anyhow, Result};
 
+/// Resolve the host to advertise in the agent card.
+///
+/// If `setting` is `"auto"`, tries Tailscale first, then the first non-loopback
+/// LAN IPv4 address. Returns an error if neither succeeds.
 pub async fn resolve_advertised_host(setting: &str) -> Result<String> {
     if setting != "auto" {
         return Ok(setting.to_string());

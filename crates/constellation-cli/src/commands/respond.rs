@@ -1,3 +1,5 @@
+//! `constellation respond` command — write a response to an inbound task.
+
 use anyhow::{anyhow, Result};
 use constellation_a2a::{Message, Part, Role, TaskState};
 use constellation_store::{tasks_in, Store};
@@ -5,6 +7,7 @@ use std::path::Path;
 
 use crate::commands::load_config;
 
+/// Record `text` as the agent response for `task_id` and mark it completed.
 pub async fn run(path: &Path, task_id: &str, text: &str) -> Result<()> {
     let cfg = load_config(path)?;
     let store = Store::open(cfg.store_path())?;

@@ -1,9 +1,12 @@
+//! `constellation peers` command — list discovered peers.
+
 use anyhow::Result;
 use constellation_store::{peers as peers_store, Store};
 use std::path::Path;
 
 use crate::commands::load_config;
 
+/// Print known peers, either as JSON (`--json`) or tab-separated text.
 pub async fn run(path: &Path, json: bool) -> Result<()> {
     let cfg = load_config(path)?;
     let store = Store::open(cfg.store_path())?;

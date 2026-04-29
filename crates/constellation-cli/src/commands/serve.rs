@@ -1,3 +1,5 @@
+//! `constellation serve` command — start the A2A server and discovery loop.
+
 use anyhow::Result;
 use constellation_discovery::{
     mdns::MdnsDiscoverer, tailscale::TailscaleDiscoverer, DiscoveredPeer, Discoverer,
@@ -9,6 +11,7 @@ use tokio::net::TcpListener;
 
 use crate::commands::{build_card_from_config, load_config};
 
+/// Start the A2A HTTP server and background discovery loop, running until Ctrl-C.
 pub async fn run(path: &Path) -> Result<()> {
     let cfg = load_config(path)?;
     let card = build_card_from_config(&cfg).await?;
@@ -39,8 +42,15 @@ pub async fn run(path: &Path) -> Result<()> {
             "mdns" => match MdnsDiscoverer::new(card.name.clone()) {
                 Ok(m) => {
                     if let Some(host_str) = card.url.host_str() {
-                        if let Ok(ip) = host_str.parse() {
-                            let _ = m.advertise(&card.name, ip, port);
+                        match host_str.parse::<std::net::IpAddr>() {
+                            Ok(ip) => {
+                                if let Err(e) = m.advertise(&card.name, ip, port) {
+                                    tracing::warn!(error=?e, "mdns advertise failed");
+                                }
+                            }
+                            Err(_) => {
+                                tracing::warn!(host=%host_str, "advertised host is not an IP; mdns advertisement skipped")
+                            }
                         }
                     }
                     discoverers.push(Box::new(m));

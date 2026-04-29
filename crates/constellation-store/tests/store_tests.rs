@@ -81,3 +81,23 @@ fn outbound_task_lifecycle() {
     assert_eq!(got.state, TaskState::Completed);
     assert!(got.updated_at <= chrono::Utc::now());
 }
+
+#[test]
+fn outbound_get_returns_none_for_unknown_id() {
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    assert!(tasks_out::get(&store, "missing").unwrap().is_none());
+}
+
+#[test]
+fn inbound_insert_is_idempotent() {
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    let msg = Message {
+        role: Role::User,
+        parts: vec![Part::Text { text: "x".into() }],
+    };
+    tasks_in::insert(&store, "dup", "peer", &msg).unwrap();
+    tasks_in::insert(&store, "dup", "peer", &msg).unwrap();
+    assert_eq!(tasks_in::list_pending(&store).unwrap().len(), 1);
+}

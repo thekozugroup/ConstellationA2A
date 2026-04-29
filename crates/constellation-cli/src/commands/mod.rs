@@ -1,3 +1,5 @@
+//! Subcommand implementations for the `constellation` CLI.
+
 pub mod card;
 pub mod inbox;
 pub mod init;
@@ -15,10 +17,12 @@ use std::net::SocketAddr;
 use std::path::Path;
 use url::Url;
 
+/// Load and parse the config file at `path`, wrapping errors with context.
 pub fn load_config(path: &Path) -> Result<Config> {
     Config::load(path).with_context(|| format!("could not load config at {}", path.display()))
 }
 
+/// Build an [`AgentCard`] from the loaded config, resolving the advertised host.
 pub async fn build_card_from_config(cfg: &Config) -> Result<AgentCard> {
     let host = crate::net::resolve_advertised_host(&cfg.network.advertised_host).await?;
     let bind: SocketAddr = cfg

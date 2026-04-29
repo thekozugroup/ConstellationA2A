@@ -1,3 +1,4 @@
+/// DDL statements that initialize all tables and indexes.
 pub const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS peers (
     id              TEXT PRIMARY KEY,

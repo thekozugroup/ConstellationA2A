@@ -12,8 +12,6 @@ description = "A2A protocol wire types for Constellation"
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-uuid = { workspace = true }
 url = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]

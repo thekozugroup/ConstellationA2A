@@ -1,8 +1,11 @@
+//! `constellation install-service` command — write a systemd unit file.
+
 use anyhow::Result;
 use std::path::PathBuf;
 
 const TEMPLATE: &str = include_str!("../../assets/constellation.service.tmpl");
 
+/// Write a systemd user unit for this binary and print enable instructions.
 pub async fn run() -> Result<()> {
     let exe = std::env::current_exe()?;
     let unit = TEMPLATE

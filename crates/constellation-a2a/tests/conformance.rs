@@ -33,3 +33,10 @@ fn tasks_get_response_round_trip() {
     assert_eq!(result.status.state.as_str(), "completed");
     assert_eq!(result.history.len(), 2);
 }
+
+#[test]
+fn rejects_wrong_jsonrpc_version() {
+    let raw = r#"{"jsonrpc":"1.0","id":"1","method":"x","params":{}}"#;
+    let res: Result<JsonRpcRequest, _> = serde_json::from_str(raw);
+    assert!(res.is_err());
+}
