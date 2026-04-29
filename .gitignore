@@ -37,3 +37,9 @@ conduit/data/
 
 # Superpowers
 .superpowers/
+
+# Constellation runtime
+Cargo.lock.bak
+*.sqlite
+*.sqlite-journal
+.constellation/

@@ -1,3 +1,0 @@
-# Agent Python dependencies (beyond constellation SDK)
-# stdlib modules (asyncio, logging, signal, json, os) need no install
-# Add any third-party deps here as agents grow

@@ -1,6 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "constellation-core",
-    "constellation-py",
-]
