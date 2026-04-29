@@ -1,0 +1,33 @@
+[package]
+name = "constellation-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "constellation"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+constellation-a2a = { path = "../constellation-a2a" }
+constellation-client = { path = "../constellation-client" }
+constellation-discovery = { path = "../constellation-discovery" }
+constellation-server = { path = "../constellation-server" }
+constellation-store = { path = "../constellation-store" }
+dirs = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "process", "signal", "fs"] }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }

@@ -1,0 +1,13 @@
+[Unit]
+Description=Constellation A2A peer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{EXE}} serve
+Restart=on-failure
+RestartSec=5
+Environment=RUST_LOG=info,constellation=info
+
+[Install]
+WantedBy=default.target
