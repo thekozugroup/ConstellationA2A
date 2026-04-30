@@ -1,45 +1,20 @@
-name: CI
+name: ci
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
 
 jobs:
-  rust-sdk:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: sdk
-      - name: Check formatting
-        run: cd sdk && cargo fmt --all -- --check
-      - name: Clippy
-        run: cd sdk && cargo clippy --all-targets -- -D warnings
-      - name: Tests
-        run: cd sdk && cargo test --all
-
-  python-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install linters
-        run: pip install ruff black
-      - name: Ruff check
-        run: ruff check agents/ cli/ examples/
-      - name: Black check
-        run: black --check agents/ cli/ examples/
-
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Conduit
-        run: docker build -t constellation-conduit ./conduit
-      - name: Validate compose
-        run: docker compose config --quiet
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace --all-targets
