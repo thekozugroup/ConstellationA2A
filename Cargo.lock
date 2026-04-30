@@ -333,8 +333,10 @@ dependencies = [
  "constellation-store",
  "dirs",
  "futures-util",
+ "rusqlite",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "toml",
  "tracing",
@@ -353,7 +355,6 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tokio",
- "tracing",
  "uuid",
  "wiremock",
 ]

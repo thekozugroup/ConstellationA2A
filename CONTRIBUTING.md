@@ -1,4 +1,4 @@
-# Contributing to Constellation A2A
+# Contributing to Constellation
 
 Thanks for your interest. The project is a Rust workspace; the entire stack
 builds with stable Rust ≥ 1.75.
@@ -6,8 +6,8 @@ builds with stable Rust ≥ 1.75.
 ## Local development
 
 ```bash
-git clone https://github.com/thekozugroup/ConstellationA2A.git
-cd ConstellationA2A
+git clone https://github.com/thekozugroup/Constellation.git
+cd Constellation
 cargo build --workspace
 cargo test --workspace
 ```

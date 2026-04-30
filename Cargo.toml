@@ -6,8 +6,8 @@ members = ["crates/*"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-authors = ["Tachyon Labs HQ <thekozugroup@gmail.com>"]
-repository = "https://github.com/thekozugroup/ConstellationA2A"
+authors = ["The Kozu Group <thekozugroup@gmail.com>"]
+repository = "https://github.com/thekozugroup/Constellation"
 rust-version = "1.75"
 
 [workspace.dependencies]
