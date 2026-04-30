@@ -204,3 +204,39 @@ async fn tasks_cancel_returns_not_implemented() {
     let err = resp.error.expect("error");
     assert_eq!(err.code, -32004);
 }
+
+#[tokio::test]
+async fn unknown_method_returns_method_not_found() {
+    let dir = tempdir().unwrap();
+    let store = Arc::new(Store::open(dir.path().join("s.db")).unwrap());
+    let state = AppState {
+        store,
+        card: card(),
+    };
+    let app = build_app(state);
+    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "tasks/frobnicate",
+        "params": {}
+    });
+    let resp: JsonRpcResponse<TaskGetResult> = reqwest::Client::new()
+        .post(format!("http://{addr}"))
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let err = resp.error.expect("error");
+    assert_eq!(err.code, -32601);
+}

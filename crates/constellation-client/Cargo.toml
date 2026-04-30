@@ -13,7 +13,6 @@ anyhow = { workspace = true }
 constellation-a2a = { path = "../constellation-a2a" }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
-tracing = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]

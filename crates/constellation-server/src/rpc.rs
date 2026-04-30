@@ -33,13 +33,17 @@ pub async fn dispatch(
         other => Err(JsonRpcError::method_not_found(other)),
     };
     let response = match outcome {
-        Ok(value) => JsonRpcResponse::<serde_json::Value>::ok(id, value),
-        Err(e) => JsonRpcResponse::<serde_json::Value>::err(id, e),
+        Ok(value) => JsonRpcResponse::<serde_json::Value>::ok(id.clone(), value),
+        Err(e) => JsonRpcResponse::<serde_json::Value>::err(id.clone(), e),
     };
     Json(serde_json::to_value(response).unwrap_or_else(|_| {
         serde_json::json!({
-            "jsonrpc":"2.0","id":null,
-            "error":{"code":-32603,"message":"failed to encode response"}
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": "failed to encode response"
+            }
         })
     }))
 }
