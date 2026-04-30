@@ -71,7 +71,7 @@ pub async fn run(path: &Path) -> Result<()> {
                 all.append(&mut got);
             }
             let store_for_writes = store.clone();
-            if let Err(e) = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            match tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
                 for peer in all {
                     peers_store::upsert_peer(&store_for_writes, &peer.card, chrono::Utc::now())?;
                 }
@@ -81,7 +81,9 @@ pub async fn run(path: &Path) -> Result<()> {
             })
             .await
             {
-                tracing::warn!(error=?e, "discovery store write join error");
+                Err(e) => tracing::warn!(error=?e, "discovery store write join error"),
+                Ok(Err(e)) => tracing::warn!(error=?e, "discovery store write error"),
+                Ok(Ok(())) => {}
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }

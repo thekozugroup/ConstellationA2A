@@ -7,12 +7,6 @@ const JSONRPC_VERSION: &str = "2.0";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonRpcVersion;
 
-impl Default for JsonRpcVersion {
-    fn default() -> Self {
-        Self
-    }
-}
-
 impl Serialize for JsonRpcVersion {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_str(JSONRPC_VERSION)

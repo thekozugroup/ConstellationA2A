@@ -110,6 +110,33 @@ fn inbound_get_returns_none_for_unknown_id() {
 }
 
 #[test]
+fn outbound_set_state_updates_state() {
+    use constellation_a2a::{Message, Part, Role, TaskState};
+
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    let msg = Message {
+        role: Role::User,
+        parts: vec![Part::Text { text: "x".into() }],
+    };
+    tasks_out::insert(&store, "ts", "peer", &msg).unwrap();
+    tasks_out::set_state(&store, "ts", TaskState::Working).unwrap();
+    let got = tasks_out::get(&store, "ts").unwrap().unwrap();
+    assert_eq!(got.state, TaskState::Working);
+}
+
+#[test]
+fn outbound_set_state_unknown_id_is_noop() {
+    use constellation_a2a::TaskState;
+
+    let dir = tempdir().unwrap();
+    let store = Store::open(dir.path().join("store.db")).unwrap();
+    // Should succeed silently — UPDATE on a non-existent row affects 0 rows.
+    tasks_out::set_state(&store, "ghost", TaskState::Failed).unwrap();
+    assert!(tasks_out::get(&store, "ghost").unwrap().is_none());
+}
+
+#[test]
 fn prune_older_than_removes_stale_peers() {
     use chrono::Duration;
 

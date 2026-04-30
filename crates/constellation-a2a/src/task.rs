@@ -115,6 +115,3 @@ pub struct TaskGetResult {
     #[serde(default)]
     pub history: Vec<Message>,
 }
-
-/// Type alias — `tasks/send` and `tasks/get` share the same result shape.
-pub type TaskSendResult = TaskGetResult;

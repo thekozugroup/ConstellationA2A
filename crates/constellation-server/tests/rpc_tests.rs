@@ -1,5 +1,6 @@
 use constellation_a2a::{
     AgentCapabilities, AgentCard, JsonRpcError, JsonRpcResponse, Skill, TaskGetResult, TaskState,
+    SOURCE_URL_HEADER,
 };
 use constellation_server::{build_app, AppState};
 use constellation_store::Store;
@@ -123,7 +124,7 @@ async fn tasks_send_records_caller_url_from_header() {
     });
     let _ = reqwest::Client::new()
         .post(format!("http://{addr}"))
-        .header("X-A2A-Source-Url", "http://10.0.0.42:7777")
+        .header(SOURCE_URL_HEADER, "http://10.0.0.42:7777")
         .json(&body)
         .send()
         .await

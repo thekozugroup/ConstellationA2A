@@ -9,8 +9,7 @@ pub use card::{AgentCapabilities, AgentCard, Skill};
 pub use error::JsonRpcError;
 pub use rpc::{JsonRpcRequest, JsonRpcResponse, JsonRpcVersion};
 pub use task::{
-    Message, Part, Role, TaskGetParams, TaskGetResult, TaskSendParams, TaskSendResult, TaskState,
-    TaskStatus,
+    Message, Part, Role, TaskGetParams, TaskGetResult, TaskSendParams, TaskState, TaskStatus,
 };
 
 /// Canonical default A2A port. Used by both the CLI's bind defaults and the
