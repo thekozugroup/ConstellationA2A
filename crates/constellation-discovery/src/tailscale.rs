@@ -148,3 +148,26 @@ impl Discoverer for TailscaleDiscoverer {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tailscale_discoverer_new() {
+        let port = 8080;
+        let timeout = Duration::from_secs(5);
+        let discoverer = TailscaleDiscoverer::new(port, timeout);
+
+        assert_eq!(discoverer.port, port);
+        assert_eq!(discoverer.probe_timeout(), timeout);
+    }
+
+    #[test]
+    fn test_tailscale_discoverer_default() {
+        let discoverer = TailscaleDiscoverer::default();
+
+        assert_eq!(discoverer.port, constellation_a2a::DEFAULT_PORT);
+        assert_eq!(discoverer.probe_timeout(), Duration::from_secs(3));
+    }
+}
