@@ -76,3 +76,16 @@ impl JsonRpcError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_error() {
+        let err = JsonRpcError::parse_error();
+        assert_eq!(err.code, -32700);
+        assert_eq!(err.message, "Parse error");
+        assert_eq!(err.data, None);
+    }
+}
