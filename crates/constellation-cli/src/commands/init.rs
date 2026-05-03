@@ -15,7 +15,7 @@ pub async fn run(
 ) -> Result<()> {
     let name = name.unwrap_or_else(|| {
         std::env::var("HOSTNAME")
-            .or_else(|_| hostname_from_uname())
+            .or_else(|_| hostname::get().map(|s| s.to_string_lossy().into_owned()))
             .unwrap_or_else(|_| "constellation-node".to_string())
     });
     let skills = skills.unwrap_or_else(|| vec!["general".to_string()]);
@@ -49,9 +49,4 @@ pub async fn run(
         )
     );
     Ok(())
-}
-
-fn hostname_from_uname() -> Result<String, std::io::Error> {
-    let out = std::process::Command::new("hostname").output()?;
-    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
