@@ -101,3 +101,26 @@ impl A2aClient {
             .ok_or_else(|| anyhow!("peer returned no result"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let client = A2aClient::new();
+        assert_eq!(client.source_url, None);
+    }
+
+    #[test]
+    fn test_default() {
+        let client = A2aClient::default();
+        assert_eq!(client.source_url, None);
+    }
+
+    #[test]
+    fn test_with_source_url() {
+        let client = A2aClient::new().with_source_url("http://example.com");
+        assert_eq!(client.source_url, Some("http://example.com".to_string()));
+    }
+}
