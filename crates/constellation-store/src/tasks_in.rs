@@ -102,6 +102,9 @@ pub fn list_pending(store: &Store) -> Result<Vec<InTask>> {
 
 /// Fetch raw rows while holding the lock, then deserialize after releasing it.
 fn list_with_states(store: &Store, states: &[&str]) -> Result<Vec<InTask>> {
+    if states.is_empty() {
+        return Ok(Vec::new());
+    }
     let raw_rows = store.with_conn(|conn| {
         let placeholders = states.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
@@ -150,4 +153,18 @@ fn list_with_states(store: &Store, states: &[&str]) -> Result<Vec<InTask>> {
         });
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_list_with_empty_states() {
+        let dir = tempdir().unwrap();
+        let store = Store::open(dir.path().join("store.db")).unwrap();
+        let result = list_with_states(&store, &[]).unwrap();
+        assert!(result.is_empty());
+    }
 }
