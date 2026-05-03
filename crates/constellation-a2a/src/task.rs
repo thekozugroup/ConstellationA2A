@@ -115,3 +115,31 @@ pub struct TaskGetResult {
     #[serde(default)]
     pub history: Vec<Message>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_state_parse() {
+        // Valid inputs
+        assert_eq!(TaskState::parse("submitted"), TaskState::Submitted);
+        assert_eq!(TaskState::parse("working"), TaskState::Working);
+        assert_eq!(TaskState::parse("input-required"), TaskState::InputRequired);
+        assert_eq!(TaskState::parse("completed"), TaskState::Completed);
+        assert_eq!(TaskState::parse("canceled"), TaskState::Canceled);
+        assert_eq!(TaskState::parse("failed"), TaskState::Failed);
+
+        // Explicit "unknown"
+        assert_eq!(TaskState::parse("unknown"), TaskState::Unknown);
+
+        // Invalid inputs
+        assert_eq!(TaskState::parse(""), TaskState::Unknown);
+        assert_eq!(TaskState::parse("invalid_state"), TaskState::Unknown);
+
+        // Case sensitivity (it should be case-sensitive and default to Unknown if cases do not match exactly)
+        assert_eq!(TaskState::parse("Submitted"), TaskState::Unknown);
+        assert_eq!(TaskState::parse("SUBMITTED"), TaskState::Unknown);
+        assert_eq!(TaskState::parse("Completed"), TaskState::Unknown);
+    }
+}
