@@ -67,14 +67,22 @@ mod tests {
         let client = reqwest::Client::new();
 
         let url = format!("http://{}/.well-known/agent.json", addr);
-        let resp = client.get(&url).send().await.expect("Failed to get agent card");
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .expect("Failed to get agent card");
         assert_eq!(resp.status(), reqwest::StatusCode::OK);
 
         let resp_card: AgentCard = resp.json().await.expect("Failed to parse agent card");
         assert_eq!(resp_card, card);
 
         let rpc_url = format!("http://{}/", addr);
-        let resp = client.post(&rpc_url).send().await.expect("Failed to POST to RPC");
+        let resp = client
+            .post(&rpc_url)
+            .send()
+            .await
+            .expect("Failed to POST to RPC");
         // We just verify it's not a 404. It might be 400 Bad Request or something else due to empty body.
         assert_ne!(resp.status(), reqwest::StatusCode::NOT_FOUND);
     }
